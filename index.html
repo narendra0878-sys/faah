@@ -1,0 +1,395 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Plant Monitoring</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #071b13;
+    color: white;
+    padding: 20px;
+}
+
+.container {
+    max-width: 600px;
+    margin: auto;
+}
+
+header {
+    text-align: center;
+    padding: 25px 10px;
+}
+
+header h1 {
+    color: #64e69a;
+    font-size: 28px;
+}
+
+header p {
+    color: #a8c6b4;
+    margin-top: 10px;
+}
+
+.card {
+    background: #102b20;
+    border: 1px solid #24543b;
+    border-radius: 18px;
+    padding: 22px;
+    margin: 17px 0;
+}
+
+.card h2 {
+    color: #b5f5cb;
+    margin-bottom: 18px;
+}
+
+.connection {
+    text-align: center;
+}
+
+.connection p {
+    margin-top: 10px;
+}
+
+.percentage {
+    font-size: 55px;
+    font-weight: bold;
+    text-align: center;
+    color: #65e99c;
+    margin: 15px;
+}
+
+.progress {
+    height: 14px;
+    background: #254637;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    width: 0%;
+    background: #4de18a;
+    transition: width .4s;
+}
+
+.status {
+    text-align: center;
+    color: #b5cbbb;
+    margin-top: 15px;
+}
+
+.result {
+    color: #65e99c;
+    margin-top: 12px;
+    text-align: center;
+}
+
+.info {
+    color: #b5cbbb;
+    line-height: 2;
+}
+
+button {
+    padding: 13px 20px;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.reset {
+    background: #345746;
+    color: white;
+    width: 100%;
+    margin-top: 15px;
+}
+
+/* Recommendation popup */
+
+.popup-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.popup {
+    width: 100%;
+    max-width: 380px;
+    background: #102b20;
+    border: 1px solid #4de18a;
+    border-radius: 20px;
+    padding: 28px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(77,225,138,.2);
+}
+
+.popup h2 {
+    color: #65e99c;
+    margin-bottom: 18px;
+}
+
+.popup p {
+    color: #c1d9ca;
+    line-height: 1.6;
+    margin-bottom: 22px;
+    font-size: 18px;
+}
+
+.ok {
+    width: 100%;
+    background: #65e99c;
+    color: #062214;
+}
+
+footer {
+    text-align: center;
+    color: #789b87;
+    font-size: 12px;
+    padding: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<header>
+    <h1>🌱 SMART PLANT</h1>
+    <p>Smart Plant Monitoring System</p>
+</header>
+
+<div class="card connection">
+    <h2>ESP32 Connection</h2>
+    <p id="connection">🟡 Connecting...</p>
+    <p>IP: 192.168.4.1</p>
+</div>
+
+<div class="card">
+    <h2>💧 Soil Moisture</h2>
+
+    <div class="percentage" id="moisture">--%</div>
+
+    <div class="progress">
+        <div class="bar" id="bar"></div>
+    </div>
+
+    <p class="status" id="moistureStatus">
+        Waiting for sensor data...
+    </p>
+</div>
+
+<div class="card">
+    <h2>🚰 Pump Status</h2>
+
+    <p class="result" id="pumpStatus">
+        Awaiting confirmation
+    </p>
+
+    <button class="reset" onclick="showCurrentRecommendation()">
+        Check Pump Recommendation
+    </button>
+</div>
+
+<div class="card">
+    <h2>📊 System Information</h2>
+
+    <div class="info">
+        Soil Sensor: ESP32 D34<br>
+        Pump: Physical Switch<br>
+        Relay: Not Used<br>
+        Controller: ESP32 Dev Kit V1<br>
+        Wi-Fi: SMART_PLANT
+    </div>
+</div>
+
+<footer>
+    SMART PLANT MONITORING SYSTEM<br>
+    Powered by ESP32
+</footer>
+
+</div>
+
+<!-- POPUP -->
+
+<div class="popup-bg" id="popupBg">
+    <div class="popup">
+
+        <h2>🌱 Plant Care Alert</h2>
+
+        <p id="popupMessage">
+            Waiting for soil readings...
+        </p>
+
+        <button class="ok" onclick="closePopup()">
+            OK
+        </button>
+
+    </div>
+</div>
+
+<script>
+
+let currentRecommendation = null;
+let lastMoisture = null;
+let popupDismissedFor = null;
+
+function showRecommendation(value) {
+
+    let recommendation;
+
+    if (value < 30) {
+        recommendation = "ON";
+    }
+    else if (value > 70) {
+        recommendation = "OFF";
+    }
+    else {
+        recommendation = "NORMAL";
+    }
+
+    currentRecommendation = recommendation;
+
+    if (recommendation === "ON") {
+        document.getElementById("popupMessage").innerHTML =
+            "🌵 Soil is dry!<br><br>Please turn ON the pump.";
+    }
+
+    else if (recommendation === "OFF") {
+        document.getElementById("popupMessage").innerHTML =
+            "💧 Soil is sufficiently moist!<br><br>Please turn OFF the pump.";
+    }
+
+    else {
+        document.getElementById("popupMessage").innerHTML =
+            "✅ Soil moisture is acceptable.<br><br>No action needed.";
+    }
+
+    if (popupDismissedFor !== recommendation) {
+        document.getElementById("popupBg").style.display = "flex";
+    }
+}
+
+function closePopup() {
+
+    popupDismissedFor = currentRecommendation;
+
+    document.getElementById("popupBg").style.display = "none";
+}
+
+function showCurrentRecommendation() {
+
+    if (lastMoisture !== null) {
+        popupDismissedFor = null;
+        showRecommendation(lastMoisture);
+    }
+}
+
+function showPumpStatus() {
+
+    const saved = localStorage.getItem("pumpStatus");
+
+    const status = document.getElementById("pumpStatus");
+
+    if (saved === "ON") {
+        status.innerText = "🟢 Pump ON (Confirmed)";
+    }
+    else if (saved === "OFF") {
+        status.innerText = "🔴 Pump OFF (Confirmed)";
+    }
+    else {
+        status.innerText = "Awaiting confirmation";
+    }
+}
+
+// Read moisture from ESP32
+
+async function updateData() {
+
+    try {
+
+        const response = await fetch(
+            "http://192.168.4.1/data",
+            {cache: "no-store"}
+        );
+
+        if (!response.ok) {
+            throw new Error("ESP32 unavailable");
+        }
+
+        const data = await response.json();
+
+        const value = Math.max(
+            0,
+            Math.min(100, Number(data.moisture))
+        );
+
+        lastMoisture = value;
+
+        document.getElementById("moisture").innerText =
+            value.toFixed(0) + "%";
+
+        document.getElementById("bar").style.width =
+            value + "%";
+
+        document.getElementById("moistureStatus").innerText =
+            value < 30 ? "Soil is dry" :
+            value > 70 ? "Soil is sufficiently moist" :
+            "Soil moisture is acceptable";
+
+        document.getElementById("connection").innerText =
+            "🟢 ESP32 Connected";
+
+        const newRecommendation =
+            value < 30 ? "ON" :
+            value > 70 ? "OFF" :
+            "NORMAL";
+
+        if (newRecommendation !== currentRecommendation) {
+            showRecommendation(value);
+        }
+
+    }
+
+    catch(error) {
+
+        document.getElementById("connection").innerText =
+            "🔴 ESP32 Disconnected";
+
+    }
+}
+
+// Save manual confirmation
+
+function setPump(value) {
+    localStorage.setItem("pumpStatus", value);
+    showPumpStatus();
+}
+
+showPumpStatus();
+
+updateData();
+
+setInterval(updateData, 3000);
+
+</script>
+
+</body>
+</html>
